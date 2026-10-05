@@ -29,6 +29,11 @@ on:
         default: ''
 
 
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+
 env:
   OPP_DEBUG: 1
   OPP_CONTAINER_OPT: "-t"
@@ -53,7 +58,7 @@ env:
   OPP_MIRROR_INDEX_NAME: "catalog"
   OPP_MIRROR_INDEX_ENABLED: "1"
   OPP_MIRROR_INDEX_MULTIARCH_BASE: "quay.io/operator-framework/opm"
-  OPP_MULTIARCH_SUPPORTED_VERSIONS: "v1.57.0"
+  OPP_MULTIARCH_SUPPORTED_VERSIONS: "v1.72.0"
   OPP_MIRROR_INDEX_MULTIARCH_POSTFIX: "s"
   IIB_INPUT_REGISTRY_USER: "framework_automation"
   OPP_REGISTRY_MIRROR_USER: "framework_automation"
@@ -83,13 +88,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       - id: files
-        uses: masesgroup/retrieve-changed-files@v2
+        uses: masesgroup/retrieve-changed-files@076a92699259d81d1c607bd91f0e1e9d45fd3151  # v2
         continue-on-error: true
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c  # v4.9.1
         with:
           python-version: '3.x'
       - name: Install dependencies
@@ -127,7 +134,7 @@ jobs:
           bash <(curl -sL $OPP_SCRIPT_ENV_URL)
       - name: Block until there is no running workflow
         if: steps.op-traffic-light.outputs.opp_release_ready == '1'
-        uses: softprops/turnstyle@v1
+        uses: softprops/turnstyle@8db075d65b19bf94e6e8687b504db69938dc3c65  # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     outputs:
@@ -166,6 +173,8 @@ jobs:
           OPP_LABELS: "${{ needs.pr-check.outputs.opp_labels }}"
           OPP_AUTO_PACKAGEMANIFEST_CLUSTER_VERSION_LABEL: "${{ needs.pr-check.outputs.opp_auto_packagemanifest_cluster_version_label }}"
           OPERATOR_INDEX_TAG: ${{ matrix.index-tag }}
+          OPP_NAME: "${{ needs.pr-check.outputs.opp_name }}"
+          OPP_VERSION: "${{ needs.pr-check.outputs.opp_version }}"
         run: |
 
           for operator_to_delete in ${{ github.event.inputs.list_of_operators }}; do
@@ -181,13 +190,15 @@ jobs:
           OPP_AUTO_PACKAGEMANIFEST_CLUSTER_VERSION_LABEL: "${{ needs.pr-check.outputs.opp_auto_packagemanifest_cluster_version_label }}"
           OPP_IIB_INSTALL: 0
           OPERATOR_INDEX_TAG: ${{ matrix.index-tag }}
+          OPP_NAME: "${{ needs.pr-check.outputs.opp_name }}"
+          OPP_VERSION: "${{ needs.pr-check.outputs.opp_version }}"
         run: |
           echo "OPP_LABELS=$OPP_LABELS"
           FAKE_RC=false
           FAKE_TYPE=$(echo $OPERATOR_INDEX_TAG | cut -d '-' -f 2)
 
-          echo "op_delete_${OPERATOR_INDEX_TAG} operators/${{ needs.pr-check.outputs.opp_name }}/${{ needs.pr-check.outputs.opp_version }} $OPP_THIS_REPO $OPP_THIS_BRANCH"
-          bash <(curl -sL $OPP_SCRIPT_URL) op_delete_${OPERATOR_INDEX_TAG} operators/${{ needs.pr-check.outputs.opp_name }}/${{ needs.pr-check.outputs.opp_version }} $OPP_THIS_REPO $OPP_THIS_BRANCH || $FAKE_RC
+          echo "op_delete_${OPERATOR_INDEX_TAG} operators/$OPP_NAME/$OPP_VERSION $OPP_THIS_REPO $OPP_THIS_BRANCH"
+          bash <(curl -sL $OPP_SCRIPT_URL) op_delete_${OPERATOR_INDEX_TAG} operators/$OPP_NAME/$OPP_VERSION $OPP_THIS_REPO $OPP_THIS_BRANCH || $FAKE_RC
 
   operators-k8s:
     name: "Index check / k8s"
@@ -246,12 +257,12 @@ jobs:
           cd operator-test-playbooks
           ansible-playbook -i localhost, -e ansible_connection=local -e run_upstream=true -e run_prepare_catalog_repo_upstream=true -e catalog_repo=$OPP_THIS_REPO_BASE/$OPP_THIS_REPO -e catalog_repo_branch=$OPP_THIS_BRANCH upstream/local.yml --tags reset_tools,operator_info -e operator_base_dir=/tmp/community-operators-for-catalog/operators -e operators=$OPP_FORCE_OPERATORS -e cluster_type=$OPP_PRODUCTION_TYPE -e strict_cluster_version_labels=true -e production_registry_namespace=$OPP_RELEASE_BUNDLE_REGISTRY/$OPP_RELEASE_BUNDLE_ORGANIZATION $ANSIBLE_ARGS
       - name: Upload operator_info
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: operator_info
           path: "/tmp/operator-test/op_info.yaml"
       - name: Upload converted operators
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: operators_converted
           path: "/tmp/operator-test/operators"
@@ -269,12 +280,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download operator_info
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: operator_info
           path: /tmp/operator-test/
       - name: Download converted operators
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: operators_converted
           path: /tmp/operator-test/operators
@@ -311,12 +322,12 @@ jobs:
       fail-fast: false
     steps:
       - name: Download operator_info
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: operator_info
           path: /tmp/operator-test/
       - name: Download converted operators
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: operators_converted
           path: /tmp/operator-test/operators
@@ -375,7 +386,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c  # v4.9.1
         with:
           python-version: '3.x'
       - name: Install dependencies
@@ -439,7 +450,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Report Status to a Slack
-        uses: ravsamhq/notify-slack-action@master
+        uses: ravsamhq/notify-slack-action@be814b201e233b2dc673608aa46e5447c8ab13f2  # 2.5.0
         with:
           notification_title: 'Release pipeline failed: ${{ needs.pr-check.outputs.opp_pr_title }}'
           token: ${{ secrets.GITHUB_TOKEN }}
